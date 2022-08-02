@@ -23,6 +23,8 @@
 // CUB_NS_QUALIFIER must also be defined to the fully qualified CUB namespace
 #if CUB_VERSION >= 101400
 #undef CUB_NS_QUALIFIER
+#else
+#error "Error2"
 #endif
 
 #define CUB_NS_PREFIX namespace fbgemm_gpu {

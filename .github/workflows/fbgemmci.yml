@@ -228,6 +228,7 @@ jobs:
         cuda_torch_version=$(echo "${{ matrix.cuda_version }}" | sed "s/\.//")
         # Install PyTorch (nightly) as required by fbgemm_gpu
         sudo pip install --pre torch -f https://download.pytorch.org/whl/nightly/cu${cuda_torch_version}/torch_nightly.html
+        cat /usr/local/cuda/include/cuda.h
 
     - name: Checkout submodules
       shell: bash
@@ -235,6 +236,7 @@ jobs:
         cd fbgemm_gpu
         git submodule sync
         git submodule update --init --recursive
+        cat /usr/local/cuda/include/cub/version.cuh
 
     - name: Build fbgemm_gpu
       shell: bash
