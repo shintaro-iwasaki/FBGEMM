@@ -15,6 +15,7 @@
 #include <cub/version.cuh>
 #else
 #define CUB_VERSION 0
+#error "Error"
 #endif
 
 // PR https://github.com/NVIDIA/cub/pull/350 introduced breaking change.
