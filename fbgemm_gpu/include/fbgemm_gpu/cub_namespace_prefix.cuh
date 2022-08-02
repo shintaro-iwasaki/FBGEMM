@@ -15,12 +15,13 @@
 #include <cub/version.cuh>
 #else
 #define CUB_VERSION 0
+#error "Error"
 #endif
 
 // PR https://github.com/NVIDIA/cub/pull/350 introduced breaking change.
 // When the CUB_NS_[PRE|POST]FIX macros are set,
 // CUB_NS_QUALIFIER must also be defined to the fully qualified CUB namespace
-#if CUB_VERSION >= 101400
+#if CUB_VERSION >= 101301
 #undef CUB_NS_QUALIFIER
 #endif
 
@@ -30,7 +31,7 @@
 // PR https://github.com/NVIDIA/cub/pull/350 introduced breaking change.
 // When the CUB_NS_[PRE|POST]FIX macros are set,
 // CUB_NS_QUALIFIER must also be defined to the fully qualified CUB namespace
-#if CUB_VERSION >= 101400
+#if CUB_VERSION >= 101301
 #define CUB_NS_QUALIFIER ::fbgemm_gpu::cub
 #endif
 
