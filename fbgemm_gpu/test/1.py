@@ -1005,6 +1005,203 @@ class SparseOpsTest(unittest.TestCase):
                 )
             )
 
+    # pyre-ignore [56]: Invalid decoration, was not able to infer the type of argument
+    @given(
+        data_type=st.sampled_from([torch.half, torch.float32]),
+        segment_value_type=st.sampled_from([torch.int, torch.long]),
+        segment_length_type=st.sampled_from([torch.int, torch.long]),
+    )
+    @settings(verbosity=Verbosity.verbose, deadline=None)
+    def test_histogram_binning_calibration_by_feature(
+        self,
+        data_type: torch.dtype,
+        segment_value_type: torch.dtype,
+        segment_length_type: torch.dtype,
+    ) -> None:
+        num_bins = 5000
+        num_segments = 42
+
+        logit = torch.tensor([-0.0018, 0.0085, 0.0090, 0.0003, 0.0029]).type(data_type)
+
+        segment_value = torch.tensor([40, 31, 32, 13, 31]).type(segment_value_type)
+        lengths = torch.tensor([[1], [1], [1], [1], [1]]).type(segment_length_type)
+
+        num_interval = num_bins * (num_segments + 1)
+        bin_num_examples = torch.empty([num_interval], dtype=torch.float64).fill_(0.0)
+        bin_num_positives = torch.empty([num_interval], dtype=torch.float64).fill_(0.0)
+
+        (
+            calibrated_prediction,
+            bin_ids,
+        ) = torch.ops.fbgemm.histogram_binning_calibration_by_feature(
+            logit=logit,
+            segment_value=segment_value,
+            segment_lengths=lengths,
+            num_segments=num_segments,
+            bin_num_examples=bin_num_examples,
+            bin_num_positives=bin_num_positives,
+            num_bins=num_bins,
+            positive_weight=0.4,
+            lower_bound=0.0,
+            upper_bound=1.0,
+            bin_ctr_in_use_after=10000,
+            bin_ctr_weight_value=0.9995,
+        )
+
+        expected_calibrated_prediction = torch.tensor(
+            [0.2853, 0.2875, 0.2876, 0.2858, 0.2863]
+        ).type(data_type)
+        expected_bin_ids = torch.tensor(
+            [206426, 161437, 166437, 71428, 161431], dtype=torch.long
+        )
+
+        torch.testing.assert_close(
+            calibrated_prediction,
+            expected_calibrated_prediction,
+            rtol=1e-03,
+            atol=1e-03,
+        )
+
+        self.assertTrue(
+            torch.equal(
+                bin_ids.long(),
+                expected_bin_ids,
+            )
+        )
+
+        if torch.cuda.is_available():
+            (
+                calibrated_prediction_gpu,
+                bin_ids_gpu,
+            ) = torch.ops.fbgemm.histogram_binning_calibration_by_feature(
+                logit=logit.cuda(),
+                segment_value=segment_value.cuda(),
+                segment_lengths=lengths.cuda(),
+                num_segments=num_segments,
+                bin_num_examples=bin_num_examples.cuda(),
+                bin_num_positives=bin_num_positives.cuda(),
+                num_bins=num_bins,
+                positive_weight=0.4,
+                lower_bound=0.0,
+                upper_bound=1.0,
+                bin_ctr_in_use_after=10000,
+                bin_ctr_weight_value=0.9995,
+            )
+
+            torch.testing.assert_close(
+                calibrated_prediction_gpu,
+                expected_calibrated_prediction.cuda(),
+                rtol=1e-03,
+                atol=1e-03,
+            )
+
+            self.assertTrue(
+                torch.equal(
+                    bin_ids_gpu.long(),
+                    expected_bin_ids.cuda(),
+                )
+            )
+
+    # pyre-ignore [56]: Invalid decoration, was not able to infer the type of argument
+    @given(
+        data_type=st.sampled_from([torch.half, torch.float32]),
+        segment_value_type=st.sampled_from([torch.int, torch.long]),
+        segment_length_type=st.sampled_from([torch.int, torch.long]),
+    )
+    @settings(verbosity=Verbosity.verbose, deadline=None)
+    def test_generic_histogram_binning_calibration_by_feature(
+        self,
+        data_type: torch.dtype,
+        segment_value_type: torch.dtype,
+        segment_length_type: torch.dtype,
+    ) -> None:
+        num_bins = 5000
+        num_segments = 42
+
+        logit = torch.tensor([-0.0018, 0.0085, 0.0090, 0.0003, 0.0029]).type(data_type)
+
+        segment_value = torch.tensor([40, 31, 32, 13, 31]).type(segment_value_type)
+        lengths = torch.tensor([[1], [1], [1], [1], [1]]).type(segment_length_type)
+
+        num_interval = num_bins * (num_segments + 1)
+        bin_num_examples = torch.empty([num_interval], dtype=torch.float64).fill_(0.0)
+        bin_num_positives = torch.empty([num_interval], dtype=torch.float64).fill_(0.0)
+
+        lower_bound = 0.0
+        upper_bound = 1.0
+        w = (upper_bound - lower_bound) / num_bins
+        bin_boundaries = torch.arange(
+            lower_bound + w, upper_bound - w / 2, w, dtype=torch.float64
+        )
+
+        (
+            calibrated_prediction,
+            bin_ids,
+        ) = torch.ops.fbgemm.generic_histogram_binning_calibration_by_feature(
+            logit=logit,
+            segment_value=segment_value,
+            segment_lengths=lengths,
+            num_segments=num_segments,
+            bin_num_examples=bin_num_examples,
+            bin_num_positives=bin_num_positives,
+            bin_boundaries=bin_boundaries,
+            positive_weight=0.4,
+            bin_ctr_in_use_after=10000,
+            bin_ctr_weight_value=0.9995,
+        )
+
+        expected_calibrated_prediction = torch.tensor(
+            [0.2853, 0.2875, 0.2876, 0.2858, 0.2863]
+        ).type(data_type)
+        expected_bin_ids = torch.tensor(
+            [206426, 161437, 166437, 71428, 161431], dtype=torch.long
+        )
+
+        torch.testing.assert_close(
+            calibrated_prediction,
+            expected_calibrated_prediction,
+            rtol=1e-03,
+            atol=1e-03,
+        )
+
+        self.assertTrue(
+            torch.equal(
+                bin_ids.long(),
+                expected_bin_ids,
+            )
+        )
+
+        if torch.cuda.is_available():
+            (
+                calibrated_prediction_gpu,
+                bin_ids_gpu,
+            ) = torch.ops.fbgemm.generic_histogram_binning_calibration_by_feature(
+                logit=logit.cuda(),
+                segment_value=segment_value.cuda(),
+                segment_lengths=lengths.cuda(),
+                num_segments=num_segments,
+                bin_num_examples=bin_num_examples.cuda(),
+                bin_num_positives=bin_num_positives.cuda(),
+                bin_boundaries=bin_boundaries.cuda(),
+                positive_weight=0.4,
+                bin_ctr_in_use_after=10000,
+                bin_ctr_weight_value=0.9995,
+            )
+
+            torch.testing.assert_close(
+                calibrated_prediction_gpu,
+                expected_calibrated_prediction.cuda(),
+                rtol=1e-03,
+                atol=1e-03,
+            )
+
+            self.assertTrue(
+                torch.equal(
+                    bin_ids_gpu.long(),
+                    expected_bin_ids.cuda(),
+                )
+            )
+
     @unittest.skipIf(*gpu_unavailable)
     # pyre-ignore [56]: Invalid decoration, was not able to infer the type of argument
     @given(
@@ -1086,6 +1283,219 @@ class SparseOpsTest(unittest.TestCase):
             )
         )
 
-if __name__ == "__main__":
+    @settings(verbosity=Verbosity.verbose, deadline=None)
+    def test_segment_sum_csr(self) -> None:
+        segment_sum_cpu = torch.ops.fbgemm.segment_sum_csr(
+            2,
+            torch.IntTensor([0, 2, 3, 5]),
+            torch.Tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]),
+        )
+        torch.testing.assert_close(
+            segment_sum_cpu, torch.Tensor([10.0, 11.0, 34.0]), rtol=0, atol=0
+        )
+        if torch.cuda.is_available():
+            segment_sum_cuda = torch.ops.fbgemm.segment_sum_csr(
+                2,
+                torch.IntTensor([0, 2, 3, 5]).cuda(),
+                torch.Tensor(
+                    [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+                ).cuda(),
+            )
+            torch.testing.assert_close(
+                segment_sum_cuda.cpu(), torch.Tensor([10.0, 11.0, 34.0]), rtol=0, atol=0
+            )
 
+    # pyre-ignore [56]: Invalid decoration, was not able to infer the type of argument
+    @given(
+        batch_size=st.just(2),
+        m=st.just(3),
+        k=st.just(4),
+        n=st.just(5),
+        use_cpu=st.booleans() if gpu_available else st.just(True),
+    )
+    @settings(verbosity=Verbosity.verbose, max_examples=20, deadline=None)
+    def test_permute102_baddbmm_permute102(
+        self,
+        batch_size: int,
+        m: int,
+        k: int,
+        n: int,
+        use_cpu: bool,
+    ) -> None:
+        # baddbmm doesn't support half
+        dtype = torch.float if use_cpu else torch.half
+        device = torch.device("cpu" if use_cpu else "cuda")
+
+        A = torch.rand((m, batch_size, k), dtype=dtype, device=device)
+        B = torch.rand((batch_size, k, n), dtype=dtype, device=device)
+        # bias_permute102 = torch.rand(batch_size, 1, n).half().cuda()
+        # bias = bias_permute102.permute(1, 0, 2)
+
+        bias = torch.rand((batch_size, n), dtype=dtype, device=device)
+        bias_permute102 = bias.unsqueeze(1)
+        # bias = bias_short.unsqueeze(0)
+
+        A_permute102 = A.permute(1, 0, 2)
+        C_permute102 = torch.baddbmm(bias_permute102, A_permute102, B)
+        C_ref = C_permute102.permute(1, 0, 2)  # (m, batch_size, n)
+
+        C = torch.ops.fbgemm.permute102_baddbmm_permute102(bias, A, B)
+        torch.testing.assert_close(C.cpu(), C_ref.cpu())
+
+    def _pack_segments_ref(
+        self,
+        lengths: torch.Tensor,
+        tensor: torch.Tensor,
+        max_length: Optional[int] = None,
+    ) -> np.ndarray:
+        lengths = lengths.numpy()
+        sections = np.split(tensor, np.cumsum(lengths))
+        max_length = np.max(lengths, initial=0) if max_length is None else max_length
+        padded_arrs = []
+        for arr in sections[:-1]:  # Last section is always a blank
+            arr = arr[: min(max_length, len(arr)), ...]
+            padded_arr = np.pad(
+                arr,
+                [(0, max(max_length - arr.shape[0], 0))]
+                + ([(0, 0)] * (len(arr.shape) - 1)),
+                constant_values=0,
+            )
+            padded_arrs.append(padded_arr)
+
+        if len(padded_arrs) == 0:
+            padded_arrs = torch.empty((0, 0) + tuple(tensor.shape[1:]))
+        else:
+            padded_arrs = torch.Tensor(np.stack(padded_arrs))
+
+        # pyre-fixme[7]: Expected `ndarray` but got `Tensor`.
+        return padded_arrs
+
+    # pyre-ignore [56]: Invalid decoration, was not able to infer the type of argument
+    @given(
+        n=st.integers(2, 10),
+        k=st.integers(2, 10),
+        batch_size=st.integers(1, 30),
+        divisions=st.integers(1, 10),
+        max_length=st.integers(1, 20),
+    )
+    @settings(deadline=None)
+    def test_pack_segments_smaller_max_len(
+        self,
+        n: int,
+        k: int,
+        batch_size: int,
+        divisions: int,
+        max_length: int,
+    ) -> None:
+        input_data = torch.tensor(np.random.rand(batch_size, n, k), dtype=torch.float32)
+        lengths = torch.tensor(
+            get_n_rand_num_summing_to_k(divisions, batch_size), dtype=torch.int
+        )
+
+        packed_tensor = torch.ops.fbgemm.pack_segments(
+            t_in=input_data,
+            lengths=lengths,
+            max_length=max_length,
+        )
+        self.assertEqual(packed_tensor.shape, (divisions, max_length, n, k))
+
+        packed_ref = self._pack_segments_ref(
+            lengths,
+            input_data,
+            max_length=max_length,
+        )
+        # pyre-fixme[6]: For 2nd param expected `Tensor` but got `ndarray`.
+        self.assertTrue(torch.equal(packed_tensor, packed_ref))
+
+        if gpu_available:
+            packed_cuda = torch.ops.fbgemm.pack_segments(
+                t_in=input_data.cuda(),
+                lengths=lengths.cuda(),
+                max_length=max_length,
+            )
+            self.assertTrue(torch.equal(packed_tensor, packed_cuda.cpu()))
+
+    # pyre-ignore [56]
+    @given(
+        N=st.integers(1, 32),
+        shape=st.lists(st.integers(1, 32), min_size=1, max_size=2),
+        dtype=st.sampled_from([torch.float, torch.half, torch.double]),
+        use_cpu=st.booleans() if gpu_available else st.just(True),
+        consecutive_indices=st.booleans(),
+    )
+    @settings(max_examples=20, deadline=None)
+    def test_index_select_dim0(
+        self,
+        N: int,
+        shape: List[int],
+        dtype: torch.dtype,
+        use_cpu: bool,
+        consecutive_indices: bool,
+    ) -> None:
+        device = torch.device("cpu" if use_cpu else "cuda")
+        U = random.randint(0, N + 1)
+        if consecutive_indices:
+            start = np.random.randint(0, U)
+            length = np.random.randint(1, U - start + 1)
+            indices = list(range(start, start + length))
+            np_arr = np.array(indices)
+            for _ in range(N - U):
+                indices.append(np.random.randint(start, start + length))
+                np_arr = np.array(indices)
+                np.random.shuffle(np_arr)
+            indices = torch.from_numpy(np_arr).to(torch.int).to(device)
+            kwargs = {
+                "consecutive_range_start": start,
+                "consecutive_range_length": length,
+            }
+        else:
+            indices = torch.randint(U, (N,), device=device)
+            kwargs = {}
+        input = torch.rand((U,) + tuple(shape), dtype=dtype, device=device)
+
+        output_ref = torch.ops.fbgemm.index_select_dim0(input, indices, **kwargs)
+        output = torch.index_select(input, 0, indices)
+
+        torch.testing.assert_close(output, output_ref)
+
+        gradcheck_args = [input.clone().detach().double().requires_grad_(True), indices]
+        for k in kwargs:
+            gradcheck_args.append(kwargs[k])
+
+        torch.autograd.gradcheck(torch.ops.fbgemm.index_select_dim0, gradcheck_args)
+
+    # pyre-ignore [56]
+    @given(
+        T=st.integers(1, 5),
+        B=st.integers(1, 5),
+        L=st.integers(1, 5),
+    )
+    @settings(max_examples=20, deadline=None)
+    def test_bottom_unique_k_per_row(
+        self,
+        T: int,
+        B: int,
+        L: int,
+    ) -> None:
+        E = 1000000
+        all_indices = (np.random.zipf(a=1.15, size=(T, B, 3 * L)) - 1) % E
+        all_indices_deduped = torch.ops.fbgemm.bottom_unique_k_per_row(
+            torch.as_tensor(all_indices), L
+        )
+        for index_tuple in itertools.product(range(T), range(B)):
+            # sample without replacement from
+            # https://stats.stackexchange.com/questions/20590/how-do-i-sample-without-replacement-using-a-sampling-with-replacement-function
+            r = set()
+            for x in all_indices[index_tuple]:
+                if x not in r:
+                    r.add(x)
+                    if len(r) == L:
+                        break
+            assert (len(r)) == L, "too skewed distribution (alpha too big)"
+            all_indices[index_tuple][:L] = sorted(r)
+        all_indices_deduped_ref = torch.as_tensor(all_indices[:, :, :L])
+        torch.testing.assert_close(all_indices_deduped, all_indices_deduped_ref)
+
+
+if __name__ == "__main__":
     unittest.main()
