@@ -121,99 +121,33 @@ class SparseOpsTest(unittest.TestCase):
 
         return permuted_lengths, permuted_indices, permuted_weights
 
-    # pyre-ignore [56]: Invalid decoration, was not able to infer the type of argument
-    @given(
-        n=st.integers(2, 10),
-        k=st.integers(2, 10),
-        batch_size=st.integers(1, 30),
-        divisions=st.integers(1, 10),
-        max_length=st.integers(1, 20),
-    )
-    @settings(deadline=None)
-    def test_pack_segments_smaller_max_len(
+    def _pack_segments_ref(
         self,
-        n: int,
-        k: int,
-        batch_size: int,
-        divisions: int,
-        max_length: int,
-    ) -> None:
-        input_data = torch.tensor(np.random.rand(batch_size, n, k), dtype=torch.float32)
-        lengths = torch.tensor(
-            get_n_rand_num_summing_to_k(divisions, batch_size), dtype=torch.int
-        )
-
-        packed_tensor = torch.ops.fbgemm.pack_segments(
-            t_in=input_data,
-            lengths=lengths,
-            max_length=max_length,
-        )
-        self.assertEqual(packed_tensor.shape, (divisions, max_length, n, k))
-
-        packed_ref = self._pack_segments_ref(
-            lengths,
-            input_data,
-            max_length=max_length,
-        )
-        # pyre-fixme[6]: For 2nd param expected `Tensor` but got `ndarray`.
-        self.assertTrue(torch.equal(packed_tensor, packed_ref))
-
-        if gpu_available:
-            packed_cuda = torch.ops.fbgemm.pack_segments(
-                t_in=input_data.cuda(),
-                lengths=lengths.cuda(),
-                max_length=max_length,
+        lengths: torch.Tensor,
+        tensor: torch.Tensor,
+        max_length: Optional[int] = None,
+    ) -> np.ndarray:
+        lengths = lengths.numpy()
+        sections = np.split(tensor, np.cumsum(lengths))
+        max_length = np.max(lengths, initial=0) if max_length is None else max_length
+        padded_arrs = []
+        for arr in sections[:-1]:  # Last section is always a blank
+            arr = arr[: min(max_length, len(arr)), ...]
+            padded_arr = np.pad(
+                arr,
+                [(0, max(max_length - arr.shape[0], 0))]
+                + ([(0, 0)] * (len(arr.shape) - 1)),
+                constant_values=0,
             )
-            self.assertTrue(torch.equal(packed_tensor, packed_cuda.cpu()))
+            padded_arrs.append(padded_arr)
 
-    # pyre-ignore [56]
-    @given(
-        N=st.integers(1, 32),
-        shape=st.lists(st.integers(1, 32), min_size=1, max_size=2),
-        dtype=st.sampled_from([torch.float, torch.half, torch.double]),
-        use_cpu=st.booleans() if gpu_available else st.just(True),
-        consecutive_indices=st.booleans(),
-    )
-    @settings(max_examples=20, deadline=None)
-    def test_index_select_dim0(
-        self,
-        N: int,
-        shape: List[int],
-        dtype: torch.dtype,
-        use_cpu: bool,
-        consecutive_indices: bool,
-    ) -> None:
-        device = torch.device("cpu" if use_cpu else "cuda")
-        U = random.randint(0, N + 1)
-        if consecutive_indices:
-            start = np.random.randint(0, U)
-            length = np.random.randint(1, U - start + 1)
-            indices = list(range(start, start + length))
-            np_arr = np.array(indices)
-            for _ in range(N - U):
-                indices.append(np.random.randint(start, start + length))
-                np_arr = np.array(indices)
-                np.random.shuffle(np_arr)
-            indices = torch.from_numpy(np_arr).to(torch.int).to(device)
-            kwargs = {
-                "consecutive_range_start": start,
-                "consecutive_range_length": length,
-            }
+        if len(padded_arrs) == 0:
+            padded_arrs = torch.empty((0, 0) + tuple(tensor.shape[1:]))
         else:
-            indices = torch.randint(U, (N,), device=device)
-            kwargs = {}
-        input = torch.rand((U,) + tuple(shape), dtype=dtype, device=device)
+            padded_arrs = torch.Tensor(np.stack(padded_arrs))
 
-        output_ref = torch.ops.fbgemm.index_select_dim0(input, indices, **kwargs)
-        output = torch.index_select(input, 0, indices)
-
-        torch.testing.assert_close(output, output_ref)
-
-        gradcheck_args = [input.clone().detach().double().requires_grad_(True), indices]
-        for k in kwargs:
-            gradcheck_args.append(kwargs[k])
-
-        torch.autograd.gradcheck(torch.ops.fbgemm.index_select_dim0, gradcheck_args)
+        # pyre-fixme[7]: Expected `ndarray` but got `Tensor`.
+        return padded_arrs
 
     # pyre-ignore [56]
     @given(
