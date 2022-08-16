@@ -121,6 +121,36 @@ class SparseOpsTest(unittest.TestCase):
 
         return permuted_lengths, permuted_indices, permuted_weights
 
+    # pyre-ignore [56]
+    @given(
+        N=st.integers(min_value=1, max_value=20),
+        offsets_type=st.sampled_from([torch.int32, torch.int64]),
+    )
+    @settings(verbosity=Verbosity.verbose, max_examples=20, deadline=None)
+    def test_offsets_range(
+        self,
+        N: int,
+        # pyre-fixme[11]: Annotation `int32` is not defined as a type.
+        # pyre-fixme[11]: Annotation `int64` is not defined as a type.
+        offsets_type: "Union[Type[torch.int32], Type[torch.int64]]",
+    ) -> None:
+        lengths = np.array([np.random.randint(low=0, high=20) for _ in range(N)])
+        offsets = np.cumsum(np.concatenate(([0], lengths)))[:-1]
+        range_ref = torch.from_numpy(
+            np.concatenate([np.arange(size) for size in lengths])
+        )
+        output_size = np.sum(lengths)
+
+        offsets_cpu = torch.tensor(offsets, dtype=offsets_type)
+        range_cpu = torch.ops.fbgemm.offsets_range(offsets_cpu, output_size)
+        range_ref = torch.tensor(range_ref, dtype=range_cpu.dtype)
+        torch.testing.assert_close(range_cpu, range_ref, rtol=0, atol=0)
+
+        if gpu_available:
+            range_gpu = torch.ops.fbgemm.offsets_range(offsets_cpu.cuda(), output_size)
+            range_ref = torch.tensor(range_ref, dtype=range_gpu.dtype)
+            torch.testing.assert_close(range_gpu.cpu(), range_ref, rtol=0, atol=0)
+
     # pyre-ignore [56]: Invalid decoration, was not able to infer the type of argument
     @given(
         data_type=st.sampled_from([torch.half, torch.float32]),
