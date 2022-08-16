@@ -48,7 +48,7 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python 1.py
+          python 1.py -v
         done
 
   build_cpu_only2:
@@ -90,7 +90,7 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python 2.py
+          python 2.py -v
         done
 
   build_cpu_only3:
@@ -132,7 +132,7 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python 3.py
+          python 3.py -v
         done
 
   build_cpu_only4:
@@ -174,7 +174,7 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python 4.py
+          python 4.py -v
         done
 
   build_cpu_only5:
@@ -216,7 +216,7 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python 5.py
+          python 5.py -v
         done
 
   build_cpu_only6:
@@ -258,7 +258,7 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python 6.py
+          python 6.py -v
         done
 
 
@@ -301,7 +301,7 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python 7.py
+          python 7.py -v
         done
 
 
@@ -344,5 +344,5 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python 8.py
+          python 8.py -v
         done
