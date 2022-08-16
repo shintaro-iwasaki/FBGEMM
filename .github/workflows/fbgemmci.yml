@@ -48,7 +48,7 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python sparse_ops_test.py
+          python 1.py
         done
 
   build_cpu_only2:
@@ -90,7 +90,7 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python quantize_ops_test.py
+          python 2.py
         done
 
   build_cpu_only3:
@@ -132,5 +132,131 @@ jobs:
         cd test
         for i in $(seq 500); do
           echo $i
-          python quantize_comm_test.py
+          python 3.py
+        done
+
+  build_cpu_only4:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install git pip python3-dev
+        sudo pip install cmake scikit-build ninja jinja2 numpy hypothesis --no-input
+        # Install pytorch 1.11 as required by fbgemm_gpu
+        sudo pip install --pre torch -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
+
+    - name: Checkout submodules
+      shell: bash
+      run: |
+        cd fbgemm_gpu
+        git submodule sync
+        git submodule update --init --recursive
+
+    - name: Build fbgemm_gpu
+      shell: bash
+      run: |
+        cd fbgemm_gpu
+        # to avoid "Permission denied" error in '/usr/local/lib/python3.8/dist-packages/' folder
+        sudo python setup.py install --cpu_only
+
+    - name: Test fbgemm_gpu cpu-only installation
+      shell: bash
+      run: |
+        cd fbgemm_gpu
+        cd test
+        for i in $(seq 500); do
+          echo $i
+          python 4.py
+        done
+
+  build_cpu_only5:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install git pip python3-dev
+        sudo pip install cmake scikit-build ninja jinja2 numpy hypothesis --no-input
+        # Install pytorch 1.11 as required by fbgemm_gpu
+        sudo pip install --pre torch -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
+
+    - name: Checkout submodules
+      shell: bash
+      run: |
+        cd fbgemm_gpu
+        git submodule sync
+        git submodule update --init --recursive
+
+    - name: Build fbgemm_gpu
+      shell: bash
+      run: |
+        cd fbgemm_gpu
+        # to avoid "Permission denied" error in '/usr/local/lib/python3.8/dist-packages/' folder
+        sudo python setup.py install --cpu_only
+
+    - name: Test fbgemm_gpu cpu-only installation
+      shell: bash
+      run: |
+        cd fbgemm_gpu
+        cd test
+        for i in $(seq 500); do
+          echo $i
+          python 5.py
+        done
+
+  build_cpu_only6:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install git pip python3-dev
+        sudo pip install cmake scikit-build ninja jinja2 numpy hypothesis --no-input
+        # Install pytorch 1.11 as required by fbgemm_gpu
+        sudo pip install --pre torch -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
+
+    - name: Checkout submodules
+      shell: bash
+      run: |
+        cd fbgemm_gpu
+        git submodule sync
+        git submodule update --init --recursive
+
+    - name: Build fbgemm_gpu
+      shell: bash
+      run: |
+        cd fbgemm_gpu
+        # to avoid "Permission denied" error in '/usr/local/lib/python3.8/dist-packages/' folder
+        sudo python setup.py install --cpu_only
+
+    - name: Test fbgemm_gpu cpu-only installation
+      shell: bash
+      run: |
+        cd fbgemm_gpu
+        cd test
+        for i in $(seq 500); do
+          echo $i
+          python 6.py
         done
