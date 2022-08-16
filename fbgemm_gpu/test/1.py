@@ -530,36 +530,6 @@ class SparseOpsTest(unittest.TestCase):
                 zc.cpu(),
             )
 
-    # pyre-ignore [56]
-    @given(
-        N=st.integers(min_value=1, max_value=20),
-        offsets_type=st.sampled_from([torch.int32, torch.int64]),
-    )
-    @settings(verbosity=Verbosity.verbose, max_examples=20, deadline=None)
-    def test_offsets_range(
-        self,
-        N: int,
-        # pyre-fixme[11]: Annotation `int32` is not defined as a type.
-        # pyre-fixme[11]: Annotation `int64` is not defined as a type.
-        offsets_type: "Union[Type[torch.int32], Type[torch.int64]]",
-    ) -> None:
-        lengths = np.array([np.random.randint(low=0, high=20) for _ in range(N)])
-        offsets = np.cumsum(np.concatenate(([0], lengths)))[:-1]
-        range_ref = torch.from_numpy(
-            np.concatenate([np.arange(size) for size in lengths])
-        )
-        output_size = np.sum(lengths)
-
-        offsets_cpu = torch.tensor(offsets, dtype=offsets_type)
-        range_cpu = torch.ops.fbgemm.offsets_range(offsets_cpu, output_size)
-        range_ref = torch.tensor(range_ref, dtype=range_cpu.dtype)
-        torch.testing.assert_close(range_cpu, range_ref, rtol=0, atol=0)
-
-        if gpu_available:
-            range_gpu = torch.ops.fbgemm.offsets_range(offsets_cpu.cuda(), output_size)
-            range_ref = torch.tensor(range_ref, dtype=range_gpu.dtype)
-            torch.testing.assert_close(range_gpu.cpu(), range_ref, rtol=0, atol=0)
-
     # pyre-ignore [56]: Invalid decoration, was not able to infer the type of argument
     @given(
         index_type=st.sampled_from([torch.int, torch.long]),
@@ -1018,6 +988,14 @@ class SparseOpsTest(unittest.TestCase):
         segment_value_type: torch.dtype,
         segment_length_type: torch.dtype,
     ) -> None:
+        import os
+        # Getting all memory using os.popen()
+        total_memory, used_memory, free_memory = map(
+            int, os.popen('free -t -m').readlines()[-1].split()[1:])
+
+        # Memory usage
+        print("RAM memory % used:", round((used_memory/total_memory) * 100, 2))
+
         num_bins = 5000
         num_segments = 42
 
@@ -1376,56 +1354,6 @@ class SparseOpsTest(unittest.TestCase):
         k=st.integers(2, 10),
         batch_size=st.integers(1, 30),
         divisions=st.integers(1, 10),
-    )
-    @settings(deadline=None)
-    def test_pack_segments(
-        self,
-        n: int,
-        k: int,
-        batch_size: int,
-        divisions: int,
-    ) -> None:
-        input_raw = np.random.rand(batch_size, n, k)
-        input_data = torch.tensor(input_raw, dtype=torch.float32, requires_grad=True)
-        lengths = torch.tensor(
-            get_n_rand_num_summing_to_k(divisions, batch_size), dtype=torch.int
-        )
-        max_length = lengths.max().item()
-
-        packed_tensor = torch.ops.fbgemm.pack_segments(
-            t_in=input_data, lengths=lengths, max_length=max_length
-        )
-
-        packed_ref = self._pack_segments_ref(lengths, input_raw)
-
-        # pyre-fixme[6]: For 2nd param expected `Tensor` but got `ndarray`.
-        self.assertTrue(torch.equal(packed_tensor, packed_ref))
-
-        grad_cpu = torch.tensor(
-            np.random.uniform(low=0.01, high=0.5, size=packed_ref.shape).astype(
-                np.float32
-            )
-        )
-        # CPU backward
-        packed_tensor.backward(grad_cpu)
-
-        if gpu_available:
-            packed_cuda = torch.ops.fbgemm.pack_segments(
-                t_in=input_data.cuda(),
-                lengths=lengths.cuda(),
-                max_length=max_length,
-            )
-            self.assertTrue(torch.equal(packed_tensor, packed_cuda.cpu()))
-
-            # GPU backward
-            packed_cuda.backward(grad_cpu.cuda())
-
-    # pyre-ignore [56]: Invalid decoration, was not able to infer the type of argument
-    @given(
-        n=st.integers(2, 10),
-        k=st.integers(2, 10),
-        batch_size=st.integers(1, 30),
-        divisions=st.integers(1, 10),
         max_length=st.integers(1, 20),
     )
     @settings(deadline=None)
@@ -1465,55 +1393,7 @@ class SparseOpsTest(unittest.TestCase):
             )
             self.assertTrue(torch.equal(packed_tensor, packed_cuda.cpu()))
 
-    # pyre-ignore [56]
-    @given(
-        N=st.integers(1, 32),
-        shape=st.lists(st.integers(1, 32), min_size=1, max_size=2),
-        dtype=st.sampled_from([torch.float, torch.half, torch.double]),
-        use_cpu=st.booleans() if gpu_available else st.just(True),
-        consecutive_indices=st.booleans(),
-    )
-    @settings(max_examples=20, deadline=None)
-    def test_index_select_dim0(
-        self,
-        N: int,
-        shape: List[int],
-        dtype: torch.dtype,
-        use_cpu: bool,
-        consecutive_indices: bool,
-    ) -> None:
-        device = torch.device("cpu" if use_cpu else "cuda")
-        U = random.randint(0, N + 1)
-        if consecutive_indices:
-            start = np.random.randint(0, U)
-            length = np.random.randint(1, U - start + 1)
-            indices = list(range(start, start + length))
-            np_arr = np.array(indices)
-            for _ in range(N - U):
-                indices.append(np.random.randint(start, start + length))
-                np_arr = np.array(indices)
-                np.random.shuffle(np_arr)
-            indices = torch.from_numpy(np_arr).to(torch.int).to(device)
-            kwargs = {
-                "consecutive_range_start": start,
-                "consecutive_range_length": length,
-            }
-        else:
-            indices = torch.randint(U, (N,), device=device)
-            kwargs = {}
-        input = torch.rand((U,) + tuple(shape), dtype=dtype, device=device)
-
-        output_ref = torch.ops.fbgemm.index_select_dim0(input, indices, **kwargs)
-        output = torch.index_select(input, 0, indices)
-
-        torch.testing.assert_close(output, output_ref)
-
-        gradcheck_args = [input.clone().detach().double().requires_grad_(True), indices]
-        for k in kwargs:
-            gradcheck_args.append(kwargs[k])
-
-        torch.autograd.gradcheck(torch.ops.fbgemm.index_select_dim0, gradcheck_args)
-
+    
     # pyre-ignore [56]
     @given(
         T=st.integers(1, 5),
