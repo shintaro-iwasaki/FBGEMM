@@ -5,7 +5,7 @@ name: Push Binary Nightly
 
 on:
   # For debugging, enable push/pull_request
-  push:
+  pull_request:
     branches:
       - main
   # run every day at 10:45 AM

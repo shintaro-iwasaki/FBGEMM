@@ -10,14 +10,14 @@ high-performance CUDA GPU operator library for GPU training and inference.
 The library provides efficient table batched embedding bag,
 data layout transformation, and quantization supports.
 
-Currently tested with CUDA 11.3, 11.5, and 11.6 in CI. In all cases, we test with PyTorch packages which are built with CUDA 11.3.
+Currently tested with CUDA 11.3, 11.5, 11.6, and 11.7 in CI. In all cases, we test with PyTorch packages which are built with CUDA 11.7.
 
-Only Intel/AMD with AVX2 extensions are currently supported.
+Only Intel/AMD CPUs with AVX2 extensions are currently supported.
 
 General build and install instructions are as follows:
 
-Build dependencies: "scikit-build","cmake","ninja","jinja2","torch>0.9","cudatoolkit",
-and for testing: "hypothesis".
+Build dependencies: `scikit-build`, `cmake`, `ninja`, `jinja2`, `torch`, `cudatoolkit`,
+and for testing: `hypothesis`.
 
 ```
 conda install scikit-build jinja2 ninja cmake hypothesis
@@ -57,7 +57,7 @@ Additional dependencies: currently cuDNN is required to be installed.
 
 ```
 # Requires PyTorch 1.13 or later
-conda install pytorch cudatoolkit=11.3 -c pytorch-nightly
+conda install pytorch pytorch-cuda=11.7 -c pytorch-nightly -c nvidia
 git clone --recursive https://github.com/pytorch/FBGEMM.git
 cd FBGEMM/fbgemm_gpu
 # if you are updating an existing checkout
@@ -125,7 +125,7 @@ export CUB_DIR=$PWD/cub-1.10.0
 ```
 
 + ###### PyTorch, Jinja2, scikit-build
-[PyTorch][2], [Jinja2][3] and are scikit-build **required** to build and run the table
+[PyTorch][2], [Jinja2][3] and scikit-build are **required** to build and run the table
 batched embedding bag operator. One thing to note is that the implementation
 of this op relies on the version of PyTorch 1.9 or later.
 
@@ -133,7 +133,7 @@ of this op relies on the version of PyTorch 1.9 or later.
 conda install scikit-build jinja2 ninja cmake
 ```
 
-## Running  FBGEMM_GPU
+## Running FBGEMM_GPU
 
 To run the tests or benchmarks after building FBGEMM_GPU (if tests or benchmarks
 are built), use the following command:
