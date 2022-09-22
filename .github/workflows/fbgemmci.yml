@@ -198,7 +198,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        version: [[apt-pip, 11.3], [apt-pip, 11.5], [apt-pip, 11.6], [apt-pip, 11.7], [conda, 11.7]]
+        version: [[pip, 11.7], [conda, 11.7]]
 
     steps:
     - uses: actions/checkout@v2
