@@ -216,7 +216,7 @@ jobs:
         sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
         sudo apt-get update
         # "11.5 -> 11-5"
-        cuda_apt_version=$(echo "${{ matrix.cuda_version[1] }}" | sed "s/\./-/")
+        cuda_apt_version=$(echo "${{ matrix.version[1] }}" | sed "s/\./-/")
         sudo apt-get -y install cuda-minimal-build-${cuda_apt_version} cuda-nvrtc-dev-${cuda_apt_version} cuda-nvtx-${cuda_apt_version} cuda-libraries-dev-${cuda_apt_version}
         sudo apt-get -y install libcudnn8-dev
 
@@ -235,7 +235,7 @@ jobs:
           wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh
           bash ~/miniconda.sh -b -p $HOME/miniconda -u
           eval "$($HOME/miniconda/bin/conda shell.bash hook)"
-          cuda_version="${{ matrix.cuda_version[1] }}"
+          cuda_version="${{ matrix.version[1] }}"
           conda install -y pytorch pytorch-cuda="$cuda_version" -c pytorch-nightly -c nvidia
           conda install -y cudnn numpy scikit-build jinja2 ninja cmake hypothesis
         fi
@@ -250,8 +250,8 @@ jobs:
       shell: bash
       run: |
         cd fbgemm_gpu
-        if [ x"${{ matrix.cuda_version[0] }}" == x"pip" ]; then
-          CUDA_PATH="/usr/local/cuda-${{ matrix.cuda_version[1] }}"
+        if [ x"${{ matrix.version[0] }}" == x"pip" ]; then
+          CUDA_PATH="/usr/local/cuda-${{ matrix.version[1] }}"
           sudo CUDACXX="${CUDA_PATH}/bin/nvcc" python setup.py install -DTORCH_CUDA_ARCH_LIST="6.0"
         else
           eval "$($HOME/miniconda/bin/conda shell.bash hook)"
@@ -261,7 +261,7 @@ jobs:
     - name: Test fbgemm_gpu installation
       shell: bash
       run: |
-        if [ x"${{ matrix.cuda_version[0] }}" == x"conda" ]; then
+        if [ x"${{ matrix.version[0] }}" == x"conda" ]; then
           eval "$($HOME/miniconda/bin/conda shell.bash hook)"
 
         fi
