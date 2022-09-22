@@ -28,7 +28,8 @@ below.
 ```
 conda install -c conda-forge cudatoolkit-dev
 ```
- Certain operations require this library to be present. Be sure to provide the path to `libnvidia-ml.so` to
+
+Certain operations require this library to be present. Be sure to provide the path to `libnvidia-ml.so` to
 `--nvml_lib_path` if installing from source (e.g. `python setup.py install --nvml_lib_path path_to_libnvidia-ml.so`).
 
 
