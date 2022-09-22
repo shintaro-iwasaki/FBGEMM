@@ -10,7 +10,7 @@ high-performance CUDA GPU operator library for GPU training and inference.
 The library provides efficient table batched embedding bag,
 data layout transformation, and quantization supports.
 
-Currently tested with CUDA 11.3, 11.5, 11.6, and 11.7 in CI. In all cases, we test with PyTorch packages which are built with CUDA 11.7.
+Currently tested with CUDA 11.3, 11.5, 11.6, and 11.7 in CI. In all cases, we test with PyTorch packages which are built with CUDA 11.3.
 
 Only Intel/AMD CPUs with AVX2 extensions are currently supported.
 
@@ -85,6 +85,7 @@ python setup.py install -DTORCH_CUDA_ARCH_LIST="7.0;8.0"
 cd bench
 python split_table_batched_embeddings_benchmark.py uvm
 ```
+
 ## Issues
 
 Building is CMAKE based and keeps state across install runs.
@@ -95,7 +96,6 @@ and using
 python setup.py clean
 ```
 to remove stale cached state can be helpfull.
-
 
 ## Examples
 
