@@ -1,0 +1,189 @@
+
+name: Build Wheel
+
+on:
+  # pull_request:
+  #   branches:
+  #     - main
+  workflow_call:
+    inputs:
+      release_version:
+        required: true
+        type: string
+      upload_pypi:
+        required: true
+        type: boolean
+
+jobs:
+  wheel_setup:
+    runs-on: ${{ matrix.os }}
+    outputs:
+      pytorch_channel: ${{ steps.output_variables.outputs.pytorch_channel }}
+      fbgemm_package_name: ${{ steps.output_variables.outputs.fbgemm_package_name }}
+    steps:
+    - id: output_variables
+      run: |
+        if [ x"${{ inputs.release_version }}" == x"nightly" ]; then
+          echo "pytorch_channel=pytorch-nightly" >> $GITHUB_OUTPUT
+          echo "fbgemm_package_name=fbgemm_gpu_nightly" >> $GITHUB_OUTPUT
+        elif [ x"${{ inputs.release_version }}" == x"prerelease" ]; then
+          echo "pytorch_channel=pytorch-test" >> $GITHUB_OUTPUT
+          echo "fbgemm_package_name=fbgemm_gpu_test" >> $GITHUB_OUTPUT
+        elif [ x"${{ inputs.release_version }}" == x"release" ]; then
+          echo "pytorch_channel=pytorch" >> $GITHUB_OUTPUT
+          echo "fbgemm_package_name=fbgemm_gpu" >> $GITHUB_OUTPUT
+        else
+          echo "Error: unknown release_version ${{ inputs.release_version }}"
+          exit 1
+        fi
+
+  # Build on CPU hosts and upload it as the GitHub Action artifact
+  build_wheel:
+    runs-on: ${{ matrix.os }}
+    needs: [wheel_setup]
+    strategy:
+      matrix:
+        os: [linux.2xlarge]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        cuda-tag: ["cu11", "cpu"]
+    steps:
+    - name: Checkout FBGEMM_GPU
+      uses: actions/checkout@v2
+      with:
+        submodules: "recursive"
+    - name: Install prerequisite packages
+      run: |
+        sudo yum install -y gcc gcc-c++
+    - name: Run build_wheel.bash
+      run: |
+        if [ x"${{ matrix.cuda-tag }}" == x"cpu" ]; then
+          # Empty string
+          PYTORCH_CUDA_VERSION=""
+        else
+          PYTORCH_CUDA_VERSION="11.7"
+        fi
+        bash .github/scripts/build_wheel.bash -v -p ${{ matrix.python-version }} -o ${{ needs.wheel_setup.outputs.fbgemm_package_name }} -P ${{ needs.wheel_setup.outputs.pytorch_channel }} -c "${PYTORCH_CUDA_VERSION}" -m "${HOME}/miniconda"
+        rm -rf "${HOME}/miniconda"
+    - name: Upload wheel as GHA artifact
+      uses: actions/upload-artifact@v3
+      with:
+        if-no-files-found: error
+        name: ${{ needs.wheel_setup.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}.whl
+        path: fbgemm_gpu/dist/${{ needs.wheel_setup.outputs.fbgemm_package_name }}-*.whl
+
+  # Download the GitHub Action artifact and test the artifact on a GPU machine
+  test_wheel_gpu:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [linux.4xlarge.nvidia.gpu]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        cuda-tag: ["cu11"]
+    needs: [wheel_setup, build_wheel]
+    steps:
+    - name: Check system information
+      shell: bash
+      run: |
+        # TODO: Do we really want this information?
+        ldd --version
+        cat /proc/cpuinfo
+        cat /proc/version
+        set -euo pipefail
+        function get_ec2_metadata() {
+          # Pulled from instance metadata endpoint for EC2
+          # see https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
+          category=$1
+          curl -fsSL "http://169.254.169.254/latest/meta-data/${category}"
+        }
+        echo "ami-id: $(get_ec2_metadata ami-id)"
+        echo "instance-id: $(get_ec2_metadata instance-id)"
+        echo "instance-type: $(get_ec2_metadata instance-type)"
+        sudo yum install lshw -y
+        sudo lshw -C display
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout FBGEMM_GPU
+      uses: actions/checkout@v2
+      with:
+        submodules: "recursive"
+    - name: Install CUDA drivers
+      shell: bash
+      run: |
+        sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+        sudo yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
+        sudo yum clean expire-cache
+        sudo yum install -y nvidia-driver-latest-dkms
+        sudo yum install -y cuda-drivers
+        # sudo yum install -y cuda-11-3
+        # sudo yum install -y libcudnn8-devel
+    # download wheel from GitHub Actions
+    - name: Download wheel
+      uses: actions/download-artifact@v3
+      with:
+        name: ${{ needs.wheel_setup.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}.whl
+    - name: Run test_wheel.bash
+      shell: bash
+      run: |
+        PYTORCH_CUDA_VERSION="11.7"
+        bash .github/scripts/test_wheel.bash -v -p ${{ matrix.python-version }} -P ${{ needs.wheel_setup.outputs.pytorch_channel }} -c "${PYTORCH_CUDA_VERSION}" -w "$(ls ${{ needs.wheel_setup.outputs.fbgemm_package_name }}*.whl)" -m "${HOME}/miniconda"
+        rm -rf "${HOME}/miniconda"
+    - name: Run test_torchrec.bash
+      shell: bash
+      run: |
+        FBGEMM_WHEEL_PATH="$(pwd)/$(ls ${{ needs.wheel_setup.outputs.fbgemm_package_name }}*.whl)"
+        git clone https://github.com/pytorch/torchrec.git
+        cd torchrec
+        git submodule update --init --recursive
+        PYTORCH_CUDA_VERSION="11.7"
+        bash .github/scripts/test_torchrec.bash -v -p ${{ matrix.python-version }} -P ${{ needs.wheel_setup.outputs.pytorch_channel }} -c "${PYTORCH_CUDA_VERSION}" -w "${FBGEMM_WHEEL_PATH}" -m "${HOME}/miniconda"
+        rm -rf "${HOME}/miniconda"
+        cd ../
+  
+  # Download the GitHub Action artifact and test the artifact on a CPU machine
+  test_wheel_cpu:
+    runs-on: ${{ matrix.os }}
+    needs: [wheel_setup, build_wheel]
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        cuda-tag: ["cpu"]
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout FBGEMM_GPU
+      uses: actions/checkout@v2
+      with:
+        submodules: "recursive"
+    # download wheel from GitHub Actions
+    - name: Download wheel
+      uses: actions/download-artifact@v3
+      with:
+        name: ${{ needs.wheel_setup.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}.whl
+    - name: Run test_wheel.bash
+      shell: bash
+      run: |
+        # Empty string for CPU
+        PYTORCH_CUDA_VERSION=""
+        bash .github/scripts/test_wheel.bash -v -p ${{ matrix.python-version }} -P ${{ needs.wheel_setup.outputs.pytorch_channel }} -c "${PYTORCH_CUDA_VERSION}" -w "$(ls ${{ needs.wheel_setup.outputs.fbgemm_package_name }}*.whl)" -m "${HOME}/miniconda"
+        rm -rf "${HOME}/miniconda"
+
+  upload_pypi:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [linux.2xlarge]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        cuda-tag: ["cu11", "cpu"]
+    needs: [wheel_setup, test_wheel_gpu, test_wheel_cpu]
+    if: ${{ inputs.upload_pypi }}
+    steps:
+    - name: Download wheel
+      uses: actions/download-artifact@v3
+      with:
+        name: ${{ needs.wheel_setup.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}.whl
+    - name: Push FBGEMM_GPU wheel to PYPI
+      env:
+        PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+      run: |
+        conda run -n build_binary python -m pip install twine
+        # Upload it to the official PYPI website
+        conda run -n build_binary python -m twine upload --username __token__ --password "$PYPI_TOKEN" --skip-existing --verbose ${{ needs.wheel_setup.outputs.fbgemm_package_name }}-*.whl
