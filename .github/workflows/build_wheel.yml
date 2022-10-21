@@ -2,9 +2,6 @@
 name: Build Wheel
 
 on:
-  # pull_request:
-  #   branches:
-  #     - main
   workflow_call:
     inputs:
       release_version:
@@ -16,7 +13,7 @@ on:
 
 jobs:
   wheel_setup:
-    runs-on: ${{ matrix.os }}
+    runs-on: [ubuntu-latest]
     outputs:
       pytorch_channel: ${{ steps.output_variables.outputs.pytorch_channel }}
       fbgemm_package_name: ${{ steps.output_variables.outputs.fbgemm_package_name }}
@@ -130,11 +127,12 @@ jobs:
       shell: bash
       run: |
         FBGEMM_WHEEL_PATH="$(pwd)/$(ls ${{ needs.wheel_setup.outputs.fbgemm_package_name }}*.whl)"
+        TEST_TORCHREC_PATH="$(pwd)/.github/scripts/test_torchrec.bash"
         git clone https://github.com/pytorch/torchrec.git
         cd torchrec
         git submodule update --init --recursive
         PYTORCH_CUDA_VERSION="11.7"
-        bash .github/scripts/test_torchrec.bash -v -p ${{ matrix.python-version }} -P ${{ needs.wheel_setup.outputs.pytorch_channel }} -c "${PYTORCH_CUDA_VERSION}" -w "${FBGEMM_WHEEL_PATH}" -m "${HOME}/miniconda"
+        bash "$TEST_TORCHREC_PATH" -v -p ${{ matrix.python-version }} -P ${{ needs.wheel_setup.outputs.pytorch_channel }} -c "${PYTORCH_CUDA_VERSION}" -w "${FBGEMM_WHEEL_PATH}" -m "${HOME}/miniconda"
         rm -rf "${HOME}/miniconda"
         cd ../
   
@@ -166,6 +164,7 @@ jobs:
         bash .github/scripts/test_wheel.bash -v -p ${{ matrix.python-version }} -P ${{ needs.wheel_setup.outputs.pytorch_channel }} -c "${PYTORCH_CUDA_VERSION}" -w "$(ls ${{ needs.wheel_setup.outputs.fbgemm_package_name }}*.whl)" -m "${HOME}/miniconda"
         rm -rf "${HOME}/miniconda"
 
+  # Upload the created wheel to PYPI
   upload_pypi:
     runs-on: ${{ matrix.os }}
     strategy:
