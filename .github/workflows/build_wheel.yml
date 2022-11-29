@@ -187,9 +187,17 @@ jobs:
         sudo yum clean expire-cache
         sudo yum install -y nvidia-driver-latest-dkms
         sudo yum install -y cuda-drivers
-    - name: NVIDIA check
+    - name: NVIDIA check-1
       continue-on-error: true
       run: |
+        which nvidia-smi
+        nvidia-smi
+        nvcc --version
+    - name: NVIDIA check-2
+      continue-on-error: true
+      run: |
+        sudo yum install -y cuda-11-3
+        which nvidia-smi
         nvidia-smi
         nvcc --version
     # download wheel from GitHub Actions
