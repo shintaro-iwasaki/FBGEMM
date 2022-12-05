@@ -12,7 +12,6 @@ on:
 
 jobs:
   test_wheel_nightly:
-    if: contains(github.event.pull_request.labels.*.name, 'test_wheel_nightly')
     uses: ./.github/workflows/build_wheel.yml
     with:
       release_version: "nightly"
