@@ -1624,7 +1624,7 @@ def nbit_construct_split_state(
 class IntNBitTableBatchedEmbeddingBagsCodegen(nn.Module):
     """
     Table-batched version of nn.EmbeddingBag(sparse=False)
-    Inference version, with FP16/FP8/INT8/INT4/INT2 supports
+    Inference version, with FP32/FP16/FP8/INT8/INT4/INT2 supports
     """
 
     embedding_specs: List[Tuple[str, int, int, SparseType, EmbeddingLocation]]
@@ -1731,7 +1731,7 @@ class IntNBitTableBatchedEmbeddingBagsCodegen(nn.Module):
             if not weight_ty.is_float():
                 assert (
                     dim % (8 / weight_ty.bit_rate()) == 0
-                ), "For quantized types we need to at least pack at byte granularity"
+                ), f"For quantized types we need to at least pack at byte granularity, dim: {dim}, weight_ty: {weight_ty}"
 
         def max_ty_D(ty: SparseType) -> int:
             return max(

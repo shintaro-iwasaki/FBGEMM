@@ -1,0 +1,75 @@
+name: Build Wheel
+
+on:
+  workflow_call:
+    inputs:
+      release_version:
+        required: true
+        type: string
+      upload_pypi:
+        required: true
+        type: boolean
+
+jobs:
+  setup_wheel_jobs:
+    runs-on: [ubuntu-latest]
+    outputs:
+      pytorch_channel: ${{ steps.output_variables.outputs.pytorch_channel }}
+      fbgemm_package_name: ${{ steps.output_variables.outputs.fbgemm_package_name }}
+      torchrec_package_name: ${{ steps.output_variables.outputs.torchrec_package_name }}
+    steps:
+    - id: output_variables
+      run: |
+
+        if [ x"${{ inputs.release_version }}" == x"nightly" ]; then
+          echo "pytorch_channel=pytorch-nightly" >> $GITHUB_OUTPUT
+          echo "fbgemm_package_name=fbgemm_gpu_nightly" >> $GITHUB_OUTPUT
+          echo "torchrec_package_name=torchrec_nightly" >> $GITHUB_OUTPUT
+        elif [ x"${{ inputs.release_version }}" == x"prerelease" ]; then
+          echo "pytorch_channel=pytorch-test" >> $GITHUB_OUTPUT
+          echo "fbgemm_package_name=fbgemm_gpu_test" >> $GITHUB_OUTPUT
+          echo "torchrec_package_name=torchrec_test" >> $GITHUB_OUTPUT
+        elif [ x"${{ inputs.release_version }}" == x"release" ]; then
+          echo "pytorch_channel=pytorch" >> $GITHUB_OUTPUT
+          echo "fbgemm_package_name=fbgemm_gpu" >> $GITHUB_OUTPUT
+          echo "torchrec_package_name=torchrec" >> $GITHUB_OUTPUT
+        else
+          echo "Error: unknown release_version ${{ inputs.release_version }}"
+          exit 1
+        fi
+
+  # Build on CPU hosts and upload *.whl as an GitHub Action artifact
+  build_wheel:
+    runs-on: ${{ matrix.os }}
+    needs: [setup_wheel_jobs]
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        cuda-tag: ["cpu", "cu11"]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Checkout submodules
+      shell: bash
+      run: |
+        set -x
+        echo "PRINT ${{ matrix.python-version }} ${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }}"
+
+  # Download the GitHub Action artifact and test the artifact on a GPU machine
+  test_wheel_gpu:
+    runs-on: ${{ matrix.os }}
+    needs: [setup_wheel_jobs, build_wheel]
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        cuda-tag: ["cu11"]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Checkout submodules
+      shell: bash
+      run: |
+        set -x
+        echo "PRINT ${{ matrix.python-version }} ${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }}"
