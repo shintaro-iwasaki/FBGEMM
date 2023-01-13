@@ -45,6 +45,7 @@ jobs:
         os: [ubuntu-latest]
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         cuda-tag: ["cpu", "cu11"]
+    runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -62,6 +63,7 @@ jobs:
         os: [ubuntu-latest]
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         cuda-tag: ["cu11"]
+    runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -79,6 +81,7 @@ jobs:
         os: [ubuntu-latest]
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         cuda-tag: ["cpu"]
+    runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
