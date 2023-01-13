@@ -3,7 +3,7 @@ name: Test Wheel
 on:
   pull_request:
     branches:
-      - main
+      - test_secret
     types:
       - opened
       - synchronize

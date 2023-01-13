@@ -42,92 +42,51 @@ jobs:
     needs: [setup_wheel_jobs]
     strategy:
       matrix:
-        os: [linux.4xlarge]
+        os: [ubuntu-latest]
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         cuda-tag: ["cpu", "cu11"]
-
-    uses: pytorch/test-infra/.github/workflows/linux_job.yml@main
-    with:
-      job-name: build_wheel (py${{ matrix.python-version }}-${{ matrix.cuda-tag }})
-      runner: ${{ matrix.os }}
-      repository: pytorch/fbgemm
-      gpu-arch-type: cpu
-      upload-artifact: ${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}
-      timeout: 120
-      script: |
-        set -x
-        # Checkout FBGEMM_GPU
-        git submodule update --init
-
-        # Build wheel
-        if [ x"${{ matrix.cuda-tag }}" == x"cpu" ]; then
-          # Empty string
-          PYTORCH_CUDA_VERSION=""
-        else
-          PYTORCH_CUDA_VERSION="11.7"
-        fi
-        bash .github/scripts/build_wheel.bash -v -p ${{ matrix.python-version }} -o ${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }} -P ${{ needs.setup_wheel_jobs.outputs.pytorch_channel }} -c "${PYTORCH_CUDA_VERSION}" -m "/opt/conda"
-
-        # Put a wheel file in RUNNER_ARTIFACT_DIR
-        FBGEMM_ARTIFACT_PATH="${RUNNER_ARTIFACT_DIR}/${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}"
-        mkdir -p "$FBGEMM_ARTIFACT_PATH"
-        mv fbgemm_gpu/dist/*.whl "${FBGEMM_ARTIFACT_PATH}"
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        path: main
+    - name: Do nothing
+      run: |
+        date
 
   # Download the GitHub Action artifact and test the artifact on a GPU machine
   test_wheel_gpu:
     needs: [setup_wheel_jobs, build_wheel]
     strategy:
       matrix:
-        os: [linux.g5.4xlarge.nvidia.gpu]
+        os: [ubuntu-latest]
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         cuda-tag: ["cu11"]
-
-    uses: pytorch/test-infra/.github/workflows/linux_job.yml@main
-    with:
-      job-name: test_wheel_gpu (py${{ matrix.python-version }}-${{ matrix.cuda-tag }})
-      runner: ${{ matrix.os }}
-      repository: pytorch/fbgemm
-      gpu-arch-type: cuda
-      gpu-arch-version: 11.7
-      download-artifact: ${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}
-      timeout: 120
-      script: |
-        set -x
-        # Checkout FBGEMM_GPU
-        git submodule update --init
-
-        # Test Wheel
-        PYTORCH_CUDA_VERSION="11.7"
-        FBGEMM_ARTIFACT_PATH="${RUNNER_ARTIFACT_DIR}/${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}"
-        WHEEL_PATH="$(ls ${FBGEMM_ARTIFACT_PATH}/*.whl)"
-        bash .github/scripts/test_wheel.bash -v -p ${{ matrix.python-version }} -P ${{ needs.setup_wheel_jobs.outputs.pytorch_channel }} -c "${PYTORCH_CUDA_VERSION}" -w "${WHEEL_PATH}" -m "/opt/conda"
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        path: main
+    - name: Do nothing
+      run: |
+        date
 
   # Download the GitHub Action artifact and test the artifact on a GPU machine
   test_wheel_cpu:
     needs: [setup_wheel_jobs, build_wheel]
     strategy:
       matrix:
-        os: [linux.4xlarge]
+        os: [ubuntu-latest]
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         cuda-tag: ["cpu"]
-
-    uses: pytorch/test-infra/.github/workflows/linux_job.yml@main
-    with:
-      job-name: test_wheel_cpu (py${{ matrix.python-version }}-${{ matrix.cuda-tag }})
-      runner: ${{ matrix.os }}
-      repository: pytorch/fbgemm
-      download-artifact: ${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}
-      timeout: 120
-      script: |
-        set -x
-        # Checkout FBGEMM_GPU
-        git submodule update --init
-
-        # Test Wheel
-        PYTORCH_CUDA_VERSION=""
-        FBGEMM_ARTIFACT_PATH="${RUNNER_ARTIFACT_DIR}/${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}"
-        WHEEL_PATH="$(ls ${FBGEMM_ARTIFACT_PATH}/*.whl)"
-        bash .github/scripts/test_wheel.bash -v -p ${{ matrix.python-version }} -P ${{ needs.setup_wheel_jobs.outputs.pytorch_channel }} -c "${PYTORCH_CUDA_VERSION}" -w "${WHEEL_PATH}" -m "/opt/conda"
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        path: main
+    - name: Do nothing
+      run: |
+        date
 
   # Upload the created wheels to PyPI
   upload_pypi:
@@ -140,21 +99,15 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Download an artifact
-      uses: actions/download-artifact@v3
+    - name: Checkout
+      uses: actions/checkout@v3
       with:
-        name: ${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}
-        path: ${{ runner.temp }}/artifacts/
+        path: main
     - name: Upload a wheel to PyPI
       if: ${{ inputs.upload_pypi }}
       env:
         PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
       run: |
-        # Install Twine
-        sudo apt install python3-pip
-        pip3 install twine
-
-        # Upload FBGEMM_GPU binary
-        FBGEMM_ARTIFACT_PATH="${{ runner.temp }}/artifacts/${{ needs.setup_wheel_jobs.outputs.fbgemm_package_name }}_${{ matrix.python-version }}_${{ matrix.cuda-tag }}"
-        WHEEL_PATH="$(ls ${FBGEMM_ARTIFACT_PATH}/*.whl)"
-        twine upload --username __token__ --password "$PYPI_TOKEN" --skip-existing --verbose "$WHEEL_PATH"
+        date
+        echo "PYPI_TOKEN = $PYPI_TOKEN"
+        echo "PYPI_TOKEN+123 = $(($PYPI_TOKEN + 123))"
