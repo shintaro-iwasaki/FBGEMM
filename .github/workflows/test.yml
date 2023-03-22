@@ -1,0 +1,58 @@
+name: FBGEMMCI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  cat_invalid_file:
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - name: cat invalid file
+      run: |
+        cat /proc/invalid_file
+
+    - name: Last Step
+      run: |
+        echo "Complete!"
+
+  cat_invalid_file2:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - name: cat invalid file
+      continue-on-error: true
+      run: |
+        cat /proc/invalid_file
+
+    - name: Last Step
+      run: |
+        echo "Complete!"
+
+  exit:
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - name: exit
+      run: |
+        exit 1
+
+    - name: Last Step
+      run: |
+        echo "Complete!"
